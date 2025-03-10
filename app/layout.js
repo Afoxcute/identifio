@@ -15,7 +15,7 @@ import Providers from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Bob-ID-verify",
+  title: "Identifio",
   description: "Seamless Institution Experience: Identity, Payments, and Access",
 };
 
