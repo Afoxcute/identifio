@@ -70,7 +70,15 @@ function AuthUser() {
         const result = await response.json();
         console.log("Success:", result);
 
-        router.push("/card");
+        // Store the user data in localStorage for persistence
+        localStorage.setItem('userIdCardData', JSON.stringify(payload));
+        
+        setSuccess(true);
+        
+        // Navigate to the card page after a short delay
+        setTimeout(() => {
+          router.push("/card");
+        }, 1000);
       } else {
         console.error("Failed to create document:", await response.json());
         setSuccess(false);

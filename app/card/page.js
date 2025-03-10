@@ -83,21 +83,54 @@ const Page = () => {
 
           setFetchedData(data.data);
 
-          const lastUser = data.data[data.data.length - 1]; // Get last user data
-          if (lastUser) {
-            setLatestData({
-              Full_Name: lastUser.Full_Name,
-              Matric_Number: lastUser.Matric_Number,
-              Passport: lastUser.Passport,
-              Phone: lastUser.Phone,
-              Wallet: lastUser.Wallet,
+          // Get the latest user data (most recently added)
+          if (data.data && data.data.length > 0) {
+            // Sort by creation date if available, otherwise use the last item
+            const sortedData = [...data.data].sort((a, b) => {
+              if (a.$createdAt && b.$createdAt) {
+                return new Date(b.$createdAt) - new Date(a.$createdAt);
+              }
+              return 0;
             });
+            
+            const lastUser = sortedData[0];
+            
+            if (lastUser) {
+              setLatestData({
+                Full_Name: lastUser.Full_Name || "",
+                Matric_Number: lastUser.Matric_Number || "",
+                Passport: lastUser.Passport || "",
+                Phone: lastUser.Phone || "",
+                Wallet: lastUser.Wallet || "",
+              });
+              
+              // Store the data in localStorage for persistence
+              localStorage.setItem('userIdCardData', JSON.stringify({
+                Full_Name: lastUser.Full_Name || "",
+                Matric_Number: lastUser.Matric_Number || "",
+                Passport: lastUser.Passport || "",
+                Phone: lastUser.Phone || "",
+                Wallet: lastUser.Wallet || "",
+              }));
+            }
           }
         } else {
           console.error("Error fetching data:", response.statusText);
+          
+          // Try to get data from localStorage if API fails
+          const storedData = localStorage.getItem('userIdCardData');
+          if (storedData) {
+            setLatestData(JSON.parse(storedData));
+          }
         }
       } catch (error) {
         console.error("Fetch error:", error);
+        
+        // Try to get data from localStorage if API fails
+        const storedData = localStorage.getItem('userIdCardData');
+        if (storedData) {
+          setLatestData(JSON.parse(storedData));
+        }
       } finally {
         setLoading(false);
       }
@@ -144,29 +177,42 @@ const Page = () => {
         align: "center",
       });
 
+      // Add user information to the PDF
       position = logoY + logoHeight + 30;
+      
+      pdf.setFontSize(16);
+      pdf.setTextColor(128, 0, 128); // Purple color
+      pdf.text("DIGITAL ID CARD INFORMATION", imgWidth / 2, position, {
+        align: "center",
+      });
+      
+      position += 15;
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0); // Black color
+      
+      // Add user details
+      pdf.text(`Full Name: ${latestData.Full_Name}`, 20, position);
+      position += 10;
+      pdf.text(`ID Number: ${latestData.Matric_Number}`, 20, position);
+      position += 10;
+      pdf.text(`Phone Number: ${latestData.Phone}`, 20, position);
+      position += 10;
+      pdf.text(`Wallet Address: ${latestData.Wallet}`, 20, position);
+      position += 20;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Add QR code image
+      pdf.addImage(imgData, "PNG", (imgWidth - imgHeight) / 2, position, imgHeight, imgHeight);
+      position += imgHeight + 10;
+      
+      pdf.setFontSize(10);
+      pdf.text("This digital ID card contains a QR code that can be scanned to verify your identity.", 20, position);
+      position += 5;
+      pdf.text("Please keep this document safe and present it when required.", 20, position);
 
-      while (heightLeft >= 0) {
-        pdf.addPage();
-        pdf.addImage(
-          imgData,
-          "PNG",
-          0,
-          position - imgHeight,
-          imgWidth,
-          imgHeight
-        );
-        heightLeft -= pageHeight;
-        position = heightLeft;
-      }
-
-      const pdfName = `STUDENTID(${formattedDate.replace(
+      const pdfName = `${latestData.Full_Name.replace(/\s+/g, "_")}_ID_Card_${formattedDate.replace(
         /\//g,
         "-"
-      )}_${formattedTime.replace(/:/g, "-")}).pdf`;
+      )}.pdf`;
       pdf.save(pdfName);
     };
   };
@@ -190,104 +236,138 @@ const Page = () => {
           {loading ? (
             <Loader />
           ) : latestData ? (
-            <div>
+            <div className="w-full max-w-md px-4">
               <ReactCardFlip isFlipped={isFlipped} flipDirection="horizontal">
                 {/* Front Side of the Card */}
                 <div className="items-center flex flex-col justify-center">
-                  <div className="bg-black  rounded-lg p-6 w-fit min-w-[300px] h-[350px] relative">
-                    <div className="flex justify-center mb-4">
-                      {latestData.Passport && (
+                  <div className="bg-black rounded-lg p-6 w-fit min-w-[320px] h-[380px] relative border border-purple-500 shadow-lg shadow-purple-500/20">
+                    <div className="absolute top-2 left-2 text-xs text-purple-300">ID CARD</div>
+                    <div className="absolute top-2 right-2 text-xs text-purple-300">STUDENT</div>
+                    
+                    <div className="flex justify-center mb-4 mt-4">
+                      {latestData.Passport ? (
                         <img
                           src={latestData.Passport}
                           alt={latestData.Full_Name}
-                          className="rounded border border-gray-300"
-                          style={{ width: "100px", height: "100px" }}
+                          className="rounded-lg border-2 border-purple-500 shadow-md"
+                          style={{ width: "120px", height: "120px", objectFit: "cover" }}
                         />
+                      ) : (
+                        <div className="w-[120px] h-[120px] bg-gray-800 rounded-lg border-2 border-purple-500 flex items-center justify-center">
+                          <span className="text-gray-400">No Image</span>
+                        </div>
                       )}
                     </div>
-                    <div className="text-center mb-4">
-                      <p className="text-lg text-white font-semibold">
+                    
+                    <div className="text-center mb-6">
+                      <p className="text-xl text-white font-bold mb-2">
                         {latestData.Full_Name}
                       </p>
-                      <p className="text-sm text-white/70">
-                        Unique ID:
-                        <div>{latestData.Matric_Number || "N/A"}</div>
-                      </p>
-                    </div>
-                    {latestData.Passport && (
-                      <div className="flex justify-center  mt-[60px] ">
-                        <img
-                          src="/chip.png"
-                          alt="Chip Icon"
-                          className="rounded-full"
-                          style={{ width: "50px", height: "50px" }}
-                        />
+                      <div className="space-y-2 mt-4">
+                        <div className="bg-purple-900/30 rounded-md p-2">
+                          <p className="text-sm text-white/70">
+                            <span className="font-medium text-purple-300">ID: </span>
+                            <span className="font-medium text-white">{latestData.Matric_Number || "N/A"}</span>
+                          </p>
+                        </div>
+                        <div className="bg-purple-900/30 rounded-md p-2">
+                          <p className="text-sm text-white/70">
+                            <span className="font-medium text-purple-300">Phone: </span>
+                            <span className="font-medium text-white">{latestData.Phone || "N/A"}</span>
+                          </p>
+                        </div>
                       </div>
-                    )}
+                    </div>
+                    
+                    <div className="flex justify-center mt-2">
+                      <img
+                        src="/chip.png"
+                        alt="Chip Icon"
+                        className="rounded-full"
+                        style={{ width: "40px", height: "40px" }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Back Side of the Card */}
                 <div className="items-center flex flex-col justify-center">
-                  <div className="bg-black  rounded-lg p-6 w-fit max-w-[300px] h-[350px] relative space-y-8">
-                    <div
-                      className="flex justify-center mb-20  bg-white p-1 w-fit items-center mx-auto"
-                      ref={reportRef}
-                    >
-                      <QRCode
-                        value={`Wallet ID : ${
-                          latestData.Wallet || "N/A"
-                        }, Phone : ${latestData.Phone || "N/A"}`}
-                        size={100}
-                      />
-                    </div>
-                    <div>
-                      <p className="mt-5 text-center text-white">
-                        Valid till : 20/09/25
-                      </p>
-                      <small className="items-center text-center block text-white px-1 mt-2">
-                        This ID should be returned to the Institution ICT center
-                        if found
-                      </small>
+                  <div className="bg-black rounded-lg p-6 w-fit min-w-[320px] h-[380px] relative border border-purple-500 shadow-lg shadow-purple-500/20">
+                    <div className="absolute top-2 left-2 text-xs text-purple-300">DIGITAL ID</div>
+                    <div className="absolute top-2 right-2 text-xs text-purple-300">BLOCKCHAIN SECURED</div>
+                    
+                    <div className="flex flex-col items-center">
+                      <div
+                        className="flex justify-center mb-4 bg-white p-2 rounded-md w-fit items-center mx-auto mt-4"
+                        ref={reportRef}
+                      >
+                        <QRCode
+                          value={`Name: ${latestData.Full_Name}, ID: ${latestData.Matric_Number}, Wallet: ${
+                            latestData.Wallet || "N/A"
+                          }, Phone: ${latestData.Phone || "N/A"}`}
+                          size={120}
+                        />
+                      </div>
+                      
+                      <div className="text-white text-sm space-y-3 w-full mt-2 bg-purple-900/20 p-3 rounded-md">
+                        <p className="flex flex-col">
+                          <span className="text-purple-300 font-medium">Wallet Address:</span>
+                          <span className="font-medium text-xs break-all">{latestData.Wallet || "N/A"}</span>
+                        </p>
+                        <p className="flex flex-col">
+                          <span className="text-purple-300 font-medium">Phone:</span>
+                          <span className="font-medium">{latestData.Phone || "N/A"}</span>
+                        </p>
+                      </div>
+                      
+                      <div className="mt-4 text-center">
+                        <p className="text-center text-white text-sm">
+                          Valid till: <span className="text-purple-300">20/09/25</span>
+                        </p>
+                        <small className="text-center block text-white/70 px-1 mt-2 text-xs">
+                          This ID should be returned to the Institution ICT center
+                          if found
+                        </small>
+                      </div>
                     </div>
                   </div>
                 </div>
               </ReactCardFlip>
 
-              <div className="flex justify-center items-center gap-6">
+              <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 mt-6">
                 <button
-                  className="bg-[#471d47] border border-gray-500 text-white w-full md:w-auto h-[48px] mt-4 px-3 rounded"
+                  className="bg-[#471d47] border border-gray-500 text-white w-full sm:w-auto h-[48px] px-6 rounded-md hover:bg-[#5e235e] transition-colors"
                   onClick={handleFlip}
                 >
                   Flip Card
                 </button>
                 <button
-                  className="bg-[#5e235e] border border-gray-500 text-white w-full md:w-auto h-[48px] mt-4 px-3 rounded"
+                  className="bg-[#5e235e] border border-gray-500 text-white w-full sm:w-auto h-[48px] px-6 rounded-md hover:bg-[#471d47] transition-colors"
                   onClick={downloadPDF}
                 >
-                  Save QRCode
+                  Download ID
                 </button>
               </div>
 
               <div className="flex justify-center items-center mt-4">
                 <button
-                  className="bg-[#220c22] border border-gray-500 text-white w-full md:w-auto h-[48px] mt-4 px-8 mr-3 rounded"
+                  className="bg-[#220c22] border border-gray-500 text-white w-full sm:w-auto h-[48px] px-8 rounded-md hover:bg-[#471d47] transition-colors"
                   onClick={openPayModal}
                 >
-                  Pay
+                  Pay for Physical ID
                 </button>
               </div>
-              <br />
-
-              <small>
-                <i className="text-white">
-                  The QR code will be used to confirm your identity in the
-                  institution's ICT Center
-                </i>
-              </small>
+              <div className="mt-4 text-center">
+                <small>
+                  <i className="text-white text-xs sm:text-sm">
+                    The QR code will be used to confirm your identity in the
+                    institution's ICT Center
+                  </i>
+                </small>
+              </div>
             </div>
           ) : (
-            <p>No data available.</p>
+            <p className="text-white">No data available. Please create an ID first.</p>
           )}
         </div>
 
